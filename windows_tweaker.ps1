@@ -49,13 +49,22 @@ Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\P
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "VerboseStatus" -Value 1
 
-# Load current users hive as that keyboard spam
-reg load "HKU\a8dfgaiwuryt8e47tg" "$env:USERPROFILE\NTUSER.DAT"
+# Ask for the target username
+$u = Read-Host "Please enter the username of your account (case-sensitive!)"
 
-New-ItemProperty -Path "HKU:\a8dfgaiwuryt8e47tg\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_TrackDocs" -PropertyType DWORD -Value 0
+# Find the user’s SID and profile path
+$sid = (Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' |
+    Where-Object {(Get-ItemProperty $_.PSPath).ProfileImagePath -like "*\$u"}).PSChildName
+$profile = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid").ProfileImagePath
 
-# Unload hive
-reg unload "HKU\a8dfgaiwuryt8e47tg"
+# Load the user hive
+reg load "HKU\TempUserHive" "$profile\NTUSER.DAT"
+
+# Disable Recommended section
+New-ItemProperty -Path "HKU:\TempUserHive\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_TrackDocs" -PropertyType DWORD -Value 0 -Force
+
+# Unload the hive
+reg unload "HKU\TempUserHive"
 
 
 # Install Firefox
@@ -81,3 +90,4 @@ Set-Content -Path $todoFile -Value $todoText
 Write-Host "Done! Restarting." -ForegroundColor Green
 Start-Sleep -Seconds 1
 Restart-Computer -Force
+
